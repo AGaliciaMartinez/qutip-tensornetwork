@@ -88,7 +88,7 @@ class FiniteTT(Network):
         network_to_tt(self, copy=False)
 
     @property
-    def node_list(self):
+    def train_nodes(self):
         """Return the nodes as an ordered list. The order goes from left to
         right in the tensor-train."""
         if self.in_edges:
@@ -153,7 +153,7 @@ class FiniteTT(Network):
     @property
     def bond_edges(self):
         """Returns the bond edges as a list sorted from left to right."""
-        return [node["rbond"] for node in self.node_list[:-1]]
+        return [node["rbond"] for node in self.train_nodes[:-1]]
 
 
     def truncate(self, bond_dimension=None, max_truncation_err = None,
@@ -198,7 +198,7 @@ class FiniteTT(Network):
         if not isinstance(max_truncation_err, list):
             max_truncation_err = [max_truncation_err] * len(self.bond_edges)
 
-        if len(self.node_list) == 1:
+        if len(self.train_nodes) == 1:
             return []
 
         total_error = []
@@ -252,19 +252,94 @@ class FiniteTT(Network):
         return total_error
 
 
-    @classmethod
-    def _fast_constructor(cls, out_edges, in_edges, nodes):
-        """Fast constructor for a TensorTrain. This is unsafe and should only be
-        used if it is known with absolute certainty that the input edges and
-        nodes form a correct TensorTrain. For example, after a matmul operation
-        with two valid networks.
-        """
-        out = cls.__new__(cls)
-        out.in_edges = in_edges
-        out.out_edges = out_edges
-        out._nodes = nodes
+    def __matmul__(self, other):
+        if not isinstance(other, FiniteTT):
+            return super().__matmul__(self, other)
+
+        self_copy = self.copy()
+        other_copy = other.copy()
+
+        nodes = []
+        for n_self, n_other in zip(self_copy.train_nodes,
+                                   other_copy.train_nodes):
+            in_out_edges = [n_self["out"]] if "out" in n_self.axis_names else []
+            in_out_edges += [n_other["in"]] if "in" in n_other.axis_names else []
+
+            lbond_edges = [n_self["lbond"]] if "lbond" in n_self.axis_names else []
+            lbond_edges += [n_other["lbond"]] if "lbond" in n_other.axis_names else []
+
+            rbond_edges = [n_self["rbond"]] if "rbond" in n_self.axis_names else []
+            rbond_edges += [n_other["rbond"]] if "rbond" in n_other.axis_names else []
+
+            edge = n_other["out"] ^ n_self["in"]
+            node = tn.contract(edge)
+            node.name = n_other.name
+            node.reorder_edges(in_out_edges + lbond_edges + rbond_edges)
+
+            if lbond_edges:
+                edge = tn.flatten_edges(lbond_edges)
+
+            nodes.append(node)
+
+        in_out_names = ["out"] if self_copy.out_edges else []
+        in_out_names += ["in"] if other_copy.in_edges else []
+        nodes[0].add_axis_names(in_out_names + ["rbond"])
+        for node in nodes[1:-1]:
+            node.add_axis_names(in_out_names+["lbond", "rbond"])
+        nodes[-1].add_axis_names(in_out_names + ["lbond"])
+
+        in_edges = [node["in"] for node in nodes if "in" in node.axis_names]
+        out_edges = [node["out"] for node in nodes if "out" in node.axis_names]
+        out = self._fast_constructor(out_edges, in_edges, nodes)
+
+        if not out.in_edges and not out.out_edges:
+            out = out.contract()
+            return out
 
         return out
+
+    def tensor(self, other):
+        if not isinstance(other, FiniteTT):
+            super().tensor(self, other)
+
+        if self_copy.in_edges and other_copy.in_edges:
+            in_edges = []
+
+        self_copy = self.copy()
+        other_copy = other.copy()
+
+        # We reshape the rightmost node from self to add an edge of dimension
+        # 1 that will connect self and other.
+        lnode = self_copy.train_nodes[-1]
+        ltensor = lnode.tensor
+        lnode = tn.Node(ltensor.reshape((*ltensor.shape, 1)),
+                       axis_names=lnode.axis_names+["rbond"])
+
+        # Same for the leftmost node from other.
+        rnode = other_copy.train_nodes[-1]
+        ltensor = lnode.tensor
+        rnode = tn.Node(ltensor.reshape((*ltensor.shape, 1)),
+                       axis_names=lnode.axis_names+["lbond"])
+
+        if self_copy.in_edges:
+            in_edges = self_copy.in_edges
+            in_edges[-1] = lnode["in"]
+        else:
+            in_edges =[]
+
+        if self_copy.out_edges:
+            in_edges = self_copy.out_edges
+            in_edges[-1] = lnode["out"]
+        else:
+            in_edges =[]
+
+
+        out = self._fast_constructor(self_copy.out_edges + other_copy.out_edges,
+                                     self_copy.in_edges + other_copy.in_edges,
+                                     list(self_copy.nodes)+
+                                     list(other_copy.nodes))
+        # Since we want tt 
+
 
 
 def _check_shape(nodes):

@@ -294,7 +294,6 @@ class Network(qutip.core.data.Data):
             out = self.copy()
             return out.contract(contractor, copy=False)
 
-        nodes_dict, edges_dict = tn.copy(self.nodes)
         nodes = set(
             [contractor(self.nodes, output_edge_order=self.out_edges + self.in_edges)]
         )
