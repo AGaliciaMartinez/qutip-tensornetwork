@@ -4,7 +4,7 @@ import pytest
 
 from qutip.core import data
 from qutip.core.data import dense
-from qutip_tensornetwork.core.data import Network, FiniteTT, network_to_tt
+from qutip_tensornetwork.core.data import Network, FiniteTT
 from qutip_tensornetwork.testing import assert_network_close
 from .conftest import random_node, random_complex_network, random_one_node_network
 import tensornetwork as tn
@@ -31,6 +31,7 @@ def assert_bond_edges_name(tt):
         assert tt.train_nodes[i]["rbond"] is edge
         assert tt.train_nodes[i + 1]["lbond"] is edge
 
+
 def random_mpo(n, d, bond_dimension):
     """Create a random mpo with n sites d dimension per site and
     bond_dimesnion."""
@@ -39,7 +40,7 @@ def random_mpo(n, d, bond_dimension):
         list_tensors += [np.random.random((d, d, bond_dimension,
                                            bond_dimension)) -1/2 for _ in range(n-2)]
         list_tensors += [np.random.random((d, d, bond_dimension)) -1/2]
-        mpo = FiniteTT.from_node_list(list_tensors)
+        mpo = FiniteTT.from_nodes(list_tensors)
     elif n==1:
         node = tn.Node(np.random.random((d, d)))
         mpo = FiniteTT(node[0:1], node[1:])
@@ -51,7 +52,6 @@ def random_tt(in_shape, out_shape):
     out_node = random_node(out_shape)
     tt = FiniteTT(out_node[:], in_node[:])
     return tt
-
 
 
 class TestInit:
@@ -155,7 +155,7 @@ class TestInit:
         assert len(tt.bond_edges) == 0
         np.testing.assert_allclose(node.tensor, tt.to_array())
 
-    def test_empty_rises(self):
+    def test_empty_raises(self):
         with pytest.raises(ValueError) as e:
             network = FiniteTT([], [], nodes=[])
 
@@ -172,7 +172,7 @@ class Test_from_node_list:
         list_tensors += [np.random.random((d, chi, chi)) for _ in range(n - 2)]
         list_tensors += [np.random.random((d, chi))]
 
-        tt = FiniteTT.from_node_list(list_tensors)
+        tt = FiniteTT.from_nodes(list_tensors)
 
         assert len(tt.train_nodes) == n
         assert len(tt.in_edges) == 0
@@ -195,7 +195,7 @@ class Test_from_node_list:
         list_tensors += [np.random.random((d, d, chi, chi)) for _ in range(n - 2)]
         list_tensors += [np.random.random((d, d, chi))]
 
-        tt = FiniteTT.from_node_list(list_tensors)
+        tt = FiniteTT.from_nodes(list_tensors)
 
         assert len(tt.train_nodes) == n
         assert len(tt.in_edges) == n
@@ -219,7 +219,7 @@ class Test_from_node_list:
         list_tensors += [np.random.random((d, d, chi))]
         list_tensors = [tn.Node(tensor) for tensor in list_tensors]
 
-        tt = FiniteTT.from_node_list(list_tensors)
+        tt = FiniteTT.from_nodes(list_tensors)
 
         assert len(tt.train_nodes) == n
         assert len(tt.in_edges) == n
@@ -244,7 +244,7 @@ class Test_from_node_list:
         list_tensors = [tn.Node(tensor) for tensor in list_tensors]
 
         with pytest.raises(ValueError):
-            FiniteTT.from_node_list(list_tensors)
+            FiniteTT.from_nodes(list_tensors)
 
     def test_incorrect_shape_raises(self, n):
         d = 3
@@ -255,7 +255,7 @@ class Test_from_node_list:
         list_tensors = [tn.Node(tensor) for tensor in list_tensors]
 
         with pytest.raises(ValueError):
-            FiniteTT.from_node_list(list_tensors)
+            FiniteTT.from_nodes(list_tensors)
 
         if n > 2:
             list_tensors = [np.random.random((d, d, chi))]
@@ -266,7 +266,7 @@ class Test_from_node_list:
             list_tensors = [tn.Node(tensor) for tensor in list_tensors]
 
             with pytest.raises(ValueError):
-                FiniteTT.from_node_list(list_tensors)
+                FiniteTT.from_nodes(list_tensors)
 
 
 @pytest.mark.parametrize(
