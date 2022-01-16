@@ -302,8 +302,19 @@ class FiniteTT(Network):
         if not isinstance(other, FiniteTT):
             super().tensor(self, other)
 
-        if self_copy.in_edges and other_copy.in_edges:
-            in_edges = []
+        # Since at this moment FiniteTT can only represent square matrices,
+        # kets and bras. We call supper when the type of operator is not one of
+        # these.
+        if (self.in_edges and not other.in_edges or
+            not self.in_edges and other.in_edges):
+            super().tensor(other)
+
+        if (self.out_edges and not other.out_edges or
+            not self.out_edges and other.out_edges):
+            super().tensor(other)
+
+        print(self.dims)
+        print(other.dims)
 
         self_copy = self.copy()
         other_copy = other.copy()
@@ -316,29 +327,38 @@ class FiniteTT(Network):
                        axis_names=lnode.axis_names+["rbond"])
 
         # Same for the leftmost node from other.
-        rnode = other_copy.train_nodes[-1]
-        ltensor = lnode.tensor
-        rnode = tn.Node(ltensor.reshape((*ltensor.shape, 1)),
-                       axis_names=lnode.axis_names+["lbond"])
+        rnode = other_copy.train_nodes[0]
+        rtensor = rnode.tensor
+        rnode = tn.Node(rtensor.reshape((*rtensor.shape, 1)),
+                       axis_names=rnode.axis_names+["lbond"])
 
         if self_copy.in_edges:
-            in_edges = self_copy.in_edges
-            in_edges[-1] = lnode["in"]
+            # We know that both self and other have in_edges
+            in_edges = self_copy.in_edges[:-1]
+            in_edges += [lnode["in"]]
+            in_edges += [rnode["in"]]
+            in_edges += self_copy.in_edges[1:]
+
         else:
             in_edges =[]
 
         if self_copy.out_edges:
-            in_edges = self_copy.out_edges
-            in_edges[-1] = lnode["out"]
+            # We know that both self and other have in_edges
+            out_edges = self_copy.out_edges[:-1]
+            out_edges += [lnode["out"]]
+            out_edges += [rnode["out"]]
+            out_edges += self_copy.out_edges[1:]
         else:
-            in_edges =[]
+            out_edges =[]
 
+        nodes = self_copy.train_nodes[:-1]
+        nodes += [lnode, rnode]
+        nodes += other_copy.train_nodes[1:]
 
-        out = self._fast_constructor(self_copy.out_edges + other_copy.out_edges,
-                                     self_copy.in_edges + other_copy.in_edges,
-                                     list(self_copy.nodes)+
-                                     list(other_copy.nodes))
-        # Since we want tt 
+        return self._fast_constructor(out_edges,
+                                     in_edges,
+                                     nodes
+                                    )
 
     def _to_tt_format(self):
         """This function is used to transform an arbitrary network into a

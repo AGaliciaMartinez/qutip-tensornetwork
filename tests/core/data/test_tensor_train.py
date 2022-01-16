@@ -18,18 +18,18 @@ def assert_nodes_name(tt):
 
 def assert_in_edges_name(tt):
     for i, edge in enumerate(tt.in_edges):
-        assert tt.train_nodes[i]["in"] is edge
+        assert tt.train_nodes[i]["in"] is edge, f"loop cycle {i}"
 
 
 def assert_out_edges_name(tt):
     for i, edge in enumerate(tt.out_edges):
-        assert tt.train_nodes[i]["out"] is edge
+        assert tt.train_nodes[i]["out"] is edge, f"loop cycle {i}"
 
 
 def assert_bond_edges_name(tt):
     for i, edge in enumerate(tt.bond_edges):
         assert tt.train_nodes[i]["rbond"] is edge
-        assert tt.train_nodes[i + 1]["lbond"] is edge
+        assert tt.train_nodes[i + 1]["lbond"] is edge, f"loop cycle {i}"
 
 
 def random_mpo(n, d, bond_dimension):
@@ -453,3 +453,34 @@ def test_tt_matmul(in_shape, out_shape, op_shape):
     assert_nodes_name(result)
     assert result.bond_dimension == [e.dimension for e in result.bond_edges]
     assert_almost_equal(result.to_array(), tt_left.to_array()@tt_right.to_array())
+
+@pytest.mark.parametrize(
+    "in_shape1, out_shape1, in_shape2, out_shape2",
+    [
+        ((2, 2, 2), (2, 2, 2), (2, 2, 2), (2, 2, 2)),
+        # ((2, 2), (2, 2), (2, 2)),
+        # ((), (2, 2, 2), (2, 2, 2)),
+        # ((2, 2, 2), (), (2, 2, 2)),
+        # ((), (), (2, 2, 2)),
+    ],
+)
+def test_tensor(in_shape1, out_shape1, in_shape2, out_shape2):
+    tt_left = random_tt(in_shape1, out_shape1)
+    tt_right = random_tt(in_shape2, out_shape2)
+
+    result = tt_left.tensor(tt_right)
+
+    assert isinstance(result, FiniteTT)
+    assert len(result.train_nodes) == len(tt_left.train_nodes) + len(tt_right.train_nodes)
+    assert result.dims[0] == list(in_shape1) + list(in_shape2)
+    assert result.dims[1] == list(out_shape1) + list(out_shape2)
+    assert result.bond_dimension == tt_left.bond_dimension + [1] + tt_right.bond_dimension
+
+    if tt_right.in_edges:
+        assert_in_edges_name(result)
+    if tt_right.out_edges:
+        assert_out_edges_name(result)
+    assert_bond_edges_name(result)
+    assert_nodes_name(result)
+    assert result.bond_dimension == [e.dimension for e in result.bond_edges]
+    assert_almost_equal(result.to_array(), np.kron(tt_left.to_array(), tt_right.to_array()))
