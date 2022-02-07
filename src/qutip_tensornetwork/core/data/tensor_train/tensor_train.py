@@ -18,14 +18,14 @@ class FiniteTT(Network):
     represent the ``in_edges`` and ``out_edges`` (which correspond to rows and
     columns of a matrix when the network is contracted into a 2D array). The
     bonds connecting the nodes can be accessed with ``bond_edges``. Nodes can
-    also be accessed in a shorted list format using ``node_list``.
+    also be accessed in a shorted list format using ``train_nodes``.
 
     Notes
     -----
     Nodes in this class have been named from 0 to L, with L the number of
     nodes, as they can be sorted (from left to right). The axes of each node
     have also been named for easy access. These are named as: {"in", "out",
-    "rbond", "lbond"}.
+    "lbond", "rbond"}.
 
     Parameters
     ----------
@@ -51,8 +51,6 @@ class FiniteTT(Network):
         in_edges and out_edges or scalar nodes, in which case they have no
         edges.
 
-    nodes_list: List of Nodes
-        Nodes of the tensor-train sorted from left to right.
     out_edges : list of Edges
         List of ``Edges`` to be used. When the network is considered as a
         matrix, these edges represent the rows.
@@ -61,10 +59,6 @@ class FiniteTT(Network):
         List of ``Edges`` to be used. When the network is considered as a
         matrix, these edges represent the columns.
 
-    bond_edges: List of Edges
-        The edges between the nodes of the tensor-train. These are sorted from
-        left to right (i.e. ``nodes_list[i]["rbond"] == bond_edges[i]``).
-
     dims : list of int
         Dimension of the system as a list of lists. dims[0] represents the
         out dimensions whereas dims[1] represents the in dimension.
@@ -72,6 +66,16 @@ class FiniteTT(Network):
     shape : tuple of int
         Shape that the matrix would have if the network is represented with a
         matrix.
+
+    bond_dims : list of int
+        Dimension of the bond edges.
+
+    train_nodes: List of Nodes
+        Nodes of the tensor-train sorted from left to right.
+
+    bond_edges: List of Edges
+        The edges between the nodes of the tensor-train. These are sorted from
+        left to right (i.e. ``nodes_list[i]["rbond"] == bond_edges[i]``).
     """
 
     def __init__(self, out_edges, in_edges, nodes=None, copy=True):
